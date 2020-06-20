@@ -1,0 +1,1 @@
+Code and data for paper Scale and Curvature Effects in Principal Geodesic Analysis 

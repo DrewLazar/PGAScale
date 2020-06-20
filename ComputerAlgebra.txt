@@ -1,0 +1,66 @@
+ Define Settings - wxm Maxima file
+-->  kill(all);
+-->  display2d:true;
+-->  dotscrules:true;
+-->  dotdistrib:true;
+-->  declare([%epsilon,s,s1,s2],scalar);
+-->  dotexptsimp:false;
+-->  tellsimp(Trace(v . v),2);tellsimp(Trace(v1 . v1),2);tellsimp(Trace(v2 . v2),2);tellsimp(Trace(v1 . v2),0);
+-->  matchdeclare(XX,scalarp);
+ Truncator function and mpow
+-->  trunc(x,n):=block([ratwtlvl:n],ratweight(s,1,%epsilon,1,s1,1,s2,1),ratexpand(x));
+-->  mpow(x,n):=if n = 0 then 1 else rat(apply(".",makelist(x,i,1,n)));
+ Define a Trace function (Trs) which simplifies
+-->  declare(Trace,multiplicative);
+-->  declare(Trace,additive);
+-->  declare(Trace,scalar);
+-->  tellsimpafter(Trace(XX),XX);
+-->  tr(x,[y]):=if y = [] then apply(Trace,[x])
+           else apply(tr,flatten([x . first(y),rest(y)]));
+-->  lteq(a,b):=block(if a = [] then true
+                else (if b = [] then false
+                          else (if is(first(a) = first(b))
+                                    then lteq(rest(a),rest(b))
+                                    else orderlessp(first(a),first(b)))));
+-->  cycle(x):=append(rest(x),[first(x)]);
+-->  mintr(x):=first(sort(makelist(x:cycle(x),i,1,length(x)),lteq));
+-->  block(matchdeclare(YYY,lambda([e],not(atom(e)))),
+defrule(Trace_in_lex_order,Trace(YYY),apply(Trace,[apply(".",mintr(args(YYY)))])),
+        simp_trace(e) := block([maxapplydepth:2],apply1(e,Trace_in_lex_order)));
+-->  Trs(x):=simp_trace(Trace(x));
+ Matrix Taylor and Log Functions
+-->  logm(x,n):=block([y:trunc(x,n)],sum(trunc(mpow(trunc(y-1,n-k+1),k)*(-1)^(k+1)/k,n),k,1,
+                                    n));
+-->  expm(x,n):=block([y:trunc(x,n)],1+sum(trunc(mpow(trunc(y,n-k+1),k)/k!,n),k,1,
+                                    n));
+ Compute the t-projection coefficient
+-->  g(n):=expm((-s*v)/2,n) . expm(%epsilon*q,n) . expm((-s*v)/2,n);
+-->  dis(n):=(1/2)*Trs(trunc(logm(g(n),n).logm(g(n),n),n+1));
+-->  dx_dis(n):=diff(dis(n),s,1);
+-->  teps(n):=sum(if oddp(i) then c[i]*%epsilon^i else 0,i,1,n);
+-->  tfor(n) := subst(teps(n),s,dx_dis(n));
+-->  eqns(n):= makelist(ratcoef(tfor(n),%epsilon^i),i,1,n,2);
+-->  tcoef(n):=solve(eqns(n),makelist(c[i],i,1,n,2));
+-->  tcoefs:tcoef(3);
+-->  texpan:block([vals: flatten([map(rhs, map(first, tcoefs)),map(rhs, map(second, tcoefs))])],
+vals[1]*%epsilon + vals[2]*%epsilon^3);
+ Calculate projection coefficients for k=2, s1 and s2
+-->  h(n):=trunc(expm(-(s1*v1+s2*v2)/2,n) . expm(%epsilon*q,n) . expm(-(s1*v1+s2*v2)/2,n),n);
+-->  dis2(n):=(1/2)*Trs(trunc(logm(h(n),n).logm(h(n),n),n+1));
+-->  s1eps(n):=sum(if oddp(i) then d[i]*%epsilon^i else 0,i,1,n);s2eps(n):=sum(if oddp(i) then f[i]*%epsilon^i else 0,i,1,n);
+-->  dx_dis1(n):=diff(dis2(n),s1,1);dx_dis2(n):=diff(dis2(n),s2,1);
+-->  sfor1(n):= subst([s1=s1eps(n), s2=s2eps(n)],dx_dis1(n));sfor2(n):= subst([s1=s1eps(n), s2=s2eps(n)],dx_dis2(n));
+-->  eqns1(n):= makelist(ratcoef(sfor1(n),%epsilon^i),i,1,n,2);eqns2(n):= makelist(ratcoef(sfor2(n),%epsilon^i),i,1,n,2);
+-->  flatten([makelist(c[i],i,1,3,2),makelist(d[i],i,1,3,2)]);
+-->  tcoef2(n):=solve(flatten([eqns1(n),eqns2(n)]),flatten([makelist(d[i],i,1,n,2),makelist(f[i],i,1,n,2)]));
+-->  tcoefs2:tcoef2(3);
+-->  block([vals: flatten([map(rhs, map(first, tcoefs2)),map(rhs, map(second, tcoefs2)),
+map(rhs, map(third, tcoefs2)),map(rhs, map(fourth,tcoefs2))])],
+t1expan:vals[1]*%epsilon + vals[2]*%epsilon^3,t2expan:vals[3]*%epsilon + vals[4]*%epsilon^3);
+-->  t1expan:block([vals: flatten([map(rhs, map(first, tcoefs2)),map(rhs, map(second, tcoefs2))])],vals[1]*%epsilon + vals[2]*%epsilon^3);
+-->  t2expan:block([vals: flatten([map(rhs, map(third, tcoefs2)),map(rhs, map(fourth, tcoefs2))])],vals[1]*%epsilon + vals[2]*%epsilon^3);
+ Terms in objective functions f1(v,%epsilon) and f2(v,%epsilon)
+-->  f1:trunc(subst(texpan,s,dis(4)),4);
+-->  f2:block([fun:trunc(subst([s1=t1expan,s2=t2expan],dis2(4)),4)],subst(v,v2,fun));
+ Difference Indicators
+-->  tauind:trunc(subst(texpan,s,dis(4)) - subst(Trace(q.v)*%epsilon/2,s,dis(4)),6);
